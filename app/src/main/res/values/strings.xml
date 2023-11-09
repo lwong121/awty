@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">awty</string>
+
+    <string name="title">AWTY?</string>
+
+    <string name="message_placeholder">Enter a message</string>
+    <string name="phone_placeholder">Enter a phone number</string>
+    <string name="interval_placeholder">Enter interval length (mins)</string>
+
+    <string name="start_button">Start</string>
+    <string name="stop_button">Stop</string>
+</resources>
