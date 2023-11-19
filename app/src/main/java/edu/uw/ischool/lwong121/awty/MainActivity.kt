@@ -6,14 +6,19 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import androidx.appcompat.app.AppCompatActivity
+import android.Manifest.permission.SEND_SMS
 import android.os.Bundle
 import android.telephony.PhoneNumberUtils
+import android.telephony.SmsManager
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import java.util.Locale
 
 const val ALARM_ACTION = "edu.uw.ischool.lwong121.ALARM"
@@ -57,50 +62,61 @@ class MainActivity : AppCompatActivity() {
         val intervalMillis = intervalMins.toLongOrNull()
 
         if (!message.isNullOrEmpty() && !phone.isNullOrEmpty() && intervalMillis != null && intervalMillis > 0) {
-            startStopBtn.text = getString(R.string.stop_button)
-            isAwtyActivated = true
+            // check that we have permission to send SMS
+            if (ContextCompat.checkSelfPermission(this, SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+                startStopBtn.text = getString(R.string.stop_button)
+                isAwtyActivated = true
 
-            val formattedPhone = PhoneNumberUtils.formatNumber(phone, Locale.getDefault().country)
+                val formattedPhone = PhoneNumberUtils.formatNumber(phone, Locale.getDefault().country)
 
-             // create the PendingIntent
-            val intent = Intent(ALARM_ACTION)
-            val pendingIntent =
-                PendingIntent.getBroadcast(activityThis, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+                // create the PendingIntent
+                val intent = Intent(ALARM_ACTION)
+                val pendingIntent = PendingIntent.getBroadcast(activityThis, 0, intent, PendingIntent.FLAG_IMMUTABLE)
 
-            // get the AlarmManager
-            val alarmManager: AlarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarmManager.setRepeating(
-                AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis(),
-                intervalMillis.times(MIN_IN_MILLIS),
-                pendingIntent
-            )
+                // get the AlarmManager
+                val alarmManager: AlarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                alarmManager.setRepeating(
+                    AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis(),
+                    intervalMillis.times(MIN_IN_MILLIS),
+                    pendingIntent
+                )
 
-            if (receiver == null) {
-                receiver = object : BroadcastReceiver() {
-                    override fun onReceive(context: Context?, intent: Intent?) {
-                        Log.i(TAG, "recieved. making toast...")
+                // setup the receiver
+                if (receiver == null) {
+                    receiver = object : BroadcastReceiver() {
+                        override fun onReceive(context: Context?, intent: Intent?) {
+                            Log.i(TAG, "Received request to send SMS to $formattedPhone")
 
-                        // original version
-                        // Toast.makeText(activityThis, "${formattedPhone}: $message", Toast.LENGTH_LONG).show()
+                            // original version
+                            // Toast.makeText(activityThis, "${formattedPhone}: $message", Toast.LENGTH_LONG).show()
 
-                        // custom toast
-                        val customToastView = layoutInflater.inflate(R.layout.custom_toast, null)
+                            // custom toast
+                            val customToastView = layoutInflater.inflate(R.layout.custom_toast, null)
 
-                        val toastCaptionTextView = customToastView.findViewById<TextView>(R.id.captionTextView)
-                        val toastMessageTextView = customToastView.findViewById<TextView>(R.id.messageTextView)
+                            val toastCaptionTextView = customToastView.findViewById<TextView>(R.id.captionTextView)
+                            val toastMessageTextView = customToastView.findViewById<TextView>(R.id.messageTextView)
 
-                        toastCaptionTextView.text = "Texting $formattedPhone"
-                        toastMessageTextView.text = message
+                            toastCaptionTextView.text = "Texting $formattedPhone"
+                            toastMessageTextView.text = message
 
-                        val customToast = Toast(activityThis)
-                        customToast.view = customToastView
-                        customToast.duration = Toast.LENGTH_LONG
-                        customToast.show()
+                            val customToast = Toast(activityThis)
+                            customToast.view = customToastView
+                            customToast.duration = Toast.LENGTH_LONG
+                            customToast.show()
+
+                            // send the SMS
+                            val smsManager = SmsManager.getDefault()
+                            smsManager.sendTextMessage(phone, null, message, null, null)
+                            Log.i(TAG, "Sent '$message' to $formattedPhone")
+                        }
                     }
+                    val filter = IntentFilter(ALARM_ACTION)
+                    registerReceiver(receiver, filter)
                 }
-                val filter = IntentFilter(ALARM_ACTION)
-                registerReceiver(receiver, filter)
+            } else {
+                // need to ask the user for permission to send SMS first
+                ActivityCompat.requestPermissions(this, arrayOf(SEND_SMS), 0)
             }
         } else {
             // create a toast so that we have some way to tell users about incorrect input
